@@ -195,11 +195,14 @@ final class Updater: ObservableObject {
         busy = true
         status = "Checking..."
         log("update", "checking github.com/\(repo) (current \(Self.currentVersion))")
-        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        // Uses the public "latest release" page (a redirect to /releases/tag/<tag>) instead of the REST API:
+        // the API allows only 60 unauthenticated requests per hour per IP, which shared office/VPN
+        // addresses exhaust. Asset URLs follow the release workflow's naming convention.
+        var req = URLRequest(url: URL(string: "https://github.com/\(repo)/releases/latest")!)
+        req.httpMethod = "HEAD"
         req.setValue("OrgScreenSaver/\(Self.currentVersion)", forHTTPHeaderField: "User-Agent")
         req.timeoutInterval = 20
-        URLSession.shared.dataTask(with: req) { data, response, error in
+        URLSession.shared.dataTask(with: req) { _, response, error in
             DispatchQueue.main.async {
                 self.busy = false
                 if let error {
@@ -207,21 +210,25 @@ final class Updater: ObservableObject {
                     log("update", "check failed: \(error.localizedDescription)")
                     return
                 }
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200, let data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let tag = json["tag_name"] as? String else {
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200, let finalURL = http.url else {
                     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                     self.status = "Check failed (HTTP \(code))"
                     log("update", "check failed: HTTP \(code)")
                     return
                 }
-                let assets = json["assets"] as? [[String: Any]] ?? []
-                func url(_ suffix: String) -> URL? {
-                    assets.first { ($0["name"] as? String)?.hasSuffix(suffix) == true }
-                        .flatMap { $0["browser_download_url"] as? String }.flatMap(URL.init)
+                // Final URL: https://github.com/<repo>/releases/tag/<tag>. Anything else means no releases yet.
+                let parts = finalURL.pathComponents
+                guard let i = parts.firstIndex(of: "tag"), i + 1 < parts.count else {
+                    self.available = nil
+                    self.status = "No releases published yet"
+                    log("update", "no releases found")
+                    return
                 }
-                if SemVer.isNewer(tag, than: Self.currentVersion), let zip = url(".zip") {
-                    self.available = Release(tag: tag, notes: json["body"] as? String ?? "", zipURL: zip, shaURL: url(".zip.sha256"))
+                let tag = parts[i + 1]
+                let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                let base = "https://github.com/\(self.repo)/releases/download/\(tag)/OrgScreenSaver-\(version).zip"
+                if SemVer.isNewer(tag, than: Self.currentVersion), let zip = URL(string: base) {
+                    self.available = Release(tag: tag, notes: "", zipURL: zip, shaURL: URL(string: base + ".sha256"))
                     self.status = "Update available: \(tag)"
                     log("update", "update available: \(tag)")
                 } else {

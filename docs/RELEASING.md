@@ -51,4 +51,4 @@ An Apple Developer ID certificate ($99/year) plus notarization removes the Gatek
 
 ## Private repositories
 
-The updater makes unauthenticated requests, so it only works with public repos or GitHub Enterprise instances reachable without a token. A private repo needs a token added to the updater, which this version does not have.
+The updater makes unauthenticated requests to `github.com` (the latest-release redirect and the release asset downloads), so it only works with public repos. It also relies on the asset names `OrgScreenSaver-<version>.zip` and `OrgScreenSaver-<version>.zip.sha256`, which `scripts/package-release.sh` produces; do not rename them. A private repo needs a token added to the updater, which this version does not have.

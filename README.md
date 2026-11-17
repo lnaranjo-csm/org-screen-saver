@@ -2,7 +2,7 @@
 
 A macOS menu bar app that covers your screen while you step away, **without locking your Mac**. Your apps, calls, downloads and Omni-Channel status keep running. Only the screen and the keyboard are taken over. The app never changes any status (Slack, Omni-Channel or otherwise).
 
-> **Status: v1.2.0.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, live wallpaper, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
+> **Status: v1.2.1.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, live wallpaper, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
 
 ## What it does
 
@@ -18,6 +18,9 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 - Logs everything it does (locks, unlocks, settings changes, permission problems) to a file.
 
 ## What's new
+
+**1.2.1**
+- **Fixed update checks failing with HTTP 403.** The updater now reads the public latest-release page instead of the GitHub REST API, whose 60-requests-per-hour per-IP limit is easily exhausted on shared office or VPN networks.
 
 **1.2.0**
 - **Settings reorganized.** Shortcut, Updates and Logs moved into the General tab as sections, and a new Permissions section shows live permission status with Grant buttons. The "Setup & Permissions..." menu item is removed; a failed lock now opens Settings at the right place instead.
@@ -153,7 +156,7 @@ The file is created automatically on first launch. It is read every time the cov
 
 ## Updates
 
-Releases are published on GitHub. The app checks `https://api.github.com/repos/<owner>/<repo>/releases/latest` (on start and daily, if enabled), and **Settings > Updates > Install** downloads the zip, verifies its SHA-256 against the release's `.sha256` file, verifies the code signature, replaces the app and relaunches. Installing is refused while locked and if the checksum asset is missing. This is the only network access the app makes.
+Releases are published on GitHub. The app checks `https://github.com/<owner>/<repo>/releases/latest` (on start and daily, if enabled; it follows the redirect to the newest tag, so it is not subject to the GitHub API's per-IP rate limit), and **Settings > Updates > Install** downloads the zip, verifies its SHA-256 against the release's `.sha256` file, verifies the code signature, replaces the app and relaunches. Installing is refused while locked and if the checksum asset is missing. This is the only network access the app makes. Release notes are not shown in the app; they are on the release page.
 
 Maintainers: see [docs/RELEASING.md](docs/RELEASING.md).
 
