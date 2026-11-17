@@ -14,15 +14,37 @@ import OrgScreenSaverCore
 /// uncovered. Live wallpaper is only used during a lock after this has completed successfully.
 enum LiveWallpaperGate {
     private(set) static var ready = false
+    private static var timer: Timer?
+    private static var running = false
 
+    /// Runs a real (tiny, short) SCStream capture while the screen is uncovered. Merely listing shareable content does
+    /// NOT trigger macOS's "bypass the system window picker" approval; only an actual startCapture does, and that prompt
+    /// recurs periodically. So the warm-up repeats while unlocked to keep the approval fresh, and a lock never starts a
+    /// capture that could raise a prompt under the cover (where it can't be clicked and blocks Touch ID).
     static func warmUp() {
-        guard Settings.shared.liveWallpaper, CGPreflightScreenCaptureAccess() else { return }
+        guard Settings.shared.liveWallpaper, CGPreflightScreenCaptureAccess() else { ready = false; return }
+        if timer == nil {
+            timer = Timer.scheduledTimer(withTimeInterval: 20 * 60, repeats: true) { _ in warmUp() }
+        }
+        guard !running, !LockCoordinator.shared.isLocked else { return }
+        running = true
         Task {
+            defer { running = false }
             do {
-                _ = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+                guard let display = content.displays.first else { return }
+                let cfg = SCStreamConfiguration()
+                cfg.width = 16
+                cfg.height = 16
+                cfg.minimumFrameInterval = CMTime(value: 1, timescale: 1)
+                let s = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: cfg, delegate: nil)
+                try await s.startCapture()
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                try? await s.stopCapture()
                 await MainActor.run { ready = true }
                 log("wallpaper", "live wallpaper warm-up ok")
             } catch {
+                await MainActor.run { ready = false }
                 log("wallpaper", "live wallpaper warm-up failed: \(error.localizedDescription); static wallpaper will be used")
             }
         }

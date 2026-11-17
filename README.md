@@ -2,7 +2,7 @@
 
 A macOS menu bar app that covers your screen while you step away, **without locking your Mac**. Your apps, calls, downloads and Omni-Channel status keep running. Only the screen and the keyboard are taken over. The app never changes any status (Slack, Omni-Channel or otherwise).
 
-> **Status: v1.2.1.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, live wallpaper, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
+> **Status: v1.2.2.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, live wallpaper, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
 
 ## What it does
 
@@ -19,6 +19,9 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 
 ## What's new
 
+**1.2.2**
+- **Fixed the macOS "bypass the system window picker" prompt appearing under the cover**, which left the screen and Touch ID unusable. The launch warm-up only listed windows, which does not trigger that approval; only a real capture does. The warm-up now runs a tiny real capture while unlocked and repeats every 20 minutes (never while locked), and it is skipped when the guard relaunches into an existing lock. If the approval still expires mid-lock, the cover is unaffected only when live wallpaper is off, so turn it off if you want zero risk.
+
 **1.2.1**
 - **Fixed update checks failing with HTTP 403.** The updater now reads the public latest-release page instead of the GitHub REST API, whose 60-requests-per-hour per-IP limit is easily exhausted on shared office or VPN networks.
 
@@ -28,7 +31,7 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 **1.1.0**
 - **Open Snapshots Folder** menu item, next to Open Log Folder (the same button also exists in Settings > Security).
 - **Fixed a crash** when the cover appeared (Start Now, Lock In and schedules all hit it). The cover window now uses the plain `NSWindow` initializer.
-- **No permission prompts under the cover.** Screen Recording / ScreenCaptureKit is exercised once at app launch, while the screen is uncovered, so any macOS prompt appears where you can answer it. During a lock, live wallpaper is used only if that warm-up succeeded; otherwise the static wallpaper is shown. (The camera was already skipped unless previously granted.)
+- **No permission prompts under the cover.** Screen Recording / ScreenCaptureKit is exercised at app launch (a real capture since 1.2.2, repeated every 20 minutes while unlocked), while the screen is uncovered, so any macOS prompt appears where you can answer it. During a lock, live wallpaper is used only if that warm-up succeeded; otherwise the static wallpaper is shown. (The camera was already skipped unless previously granted.)
 - **Stable code signing.** `build-app-bundle.sh` now signs with your `CODESIGN_IDENTITY`, else the first "Apple Development" certificate in your keychain, else ad-hoc (with a warning). A stable signature keeps Accessibility, Screen Recording and Camera grants across rebuilds. See [Signing and permissions](#signing-and-permissions).
 
 ## What it is not
@@ -94,7 +97,7 @@ Settings has four tabs: General, Security, Schedule and Proximity.
 
 - **General:** one scrolling page with these sections:
   - *General:* launch at login, keep display awake, live wallpaper on/off, optional **message** on the cover (empty by default).
-  - *Permissions:* live status (checked every second) and a Grant button for Accessibility, Screen Recording and Camera, plus Touch ID availability. Grant permissions here before locking: a macOS prompt that appears under the cover cannot be answered. Relaunch the app after granting Screen Recording so live wallpaper turns on.
+  - *Permissions:* live status (checked every second) and a Grant button for Accessibility, Screen Recording and Camera, plus Touch ID availability. Grant permissions here before locking: a macOS prompt that appears under the cover cannot be answered. Relaunch the app after granting Screen Recording so live wallpaper turns on. macOS re-asks for screen capture approval roughly monthly ("Allow For One Month"); the app triggers it while unlocked so you can answer it.
   - *Shortcut:* an optional global shortcut to start the screen saver. **Off by default.** It must include Control, Option or Command.
   - *Updates:* current version, automatic check on/off, check now, install updates from GitHub releases. "Check for Updates..." in the menu jumps straight to this section.
   - *Logs:* view the recent log, refresh it, and open the folder.

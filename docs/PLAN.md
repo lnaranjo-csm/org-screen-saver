@@ -301,7 +301,7 @@ Each milestone is runnable and testable on its own, always with ESC enabled unti
 |---|---|
 | `disableForceQuit` behavior can vary across macOS versions | Verify on your macOS version in M2; event tap is a second layer |
 | ScreenCaptureKit may not return Backdrop's windows | Spike in M4 first; static and black fallbacks exist |
-| macOS shows a recurring "app is recording your screen" prompt (Sequoia and later) | Document it; live wallpaper is optional |
+| macOS shows a recurring "app is recording your screen" prompt (Sequoia and later) | Warm up with a real capture every 20 min while unlocked (never during a lock); live wallpaper is optional |
 | Notification banners can appear over the cover | DND on lock, documented |
 | Accessibility permission resets after rebuilds with a new signature | Use a stable ad-hoc identity in `build-app-bundle.sh`; wizard re-checks |
 | Corporate MDM may restrict Accessibility or unsigned apps | Local build avoids quarantine; confirm with IT if MDM blocks it |

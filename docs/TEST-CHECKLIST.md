@@ -42,6 +42,8 @@ Record pass/fail and any log lines for each failure.
 - [ ] With Backdrop running, the live wallpaper shows (log line "capturing N desktop-level window(s)")
 - [ ] No app windows or notifications content are visible in the captured wallpaper
 - [ ] Second display gets its own wallpaper
+- [ ] Screen capture approval prompt (if shown) appears while unlocked, never under the cover; log shows "live wallpaper warm-up ok"
+- [ ] Touch ID and keyboard work normally right after the lock starts
 
 ## 5. Everything keeps running
 - [ ] A download or a timer keeps progressing behind the cover
