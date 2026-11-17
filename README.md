@@ -2,13 +2,13 @@
 
 A macOS menu bar app that covers your screen while you step away, **without locking your Mac**. Your apps, calls, downloads and Omni-Channel status keep running. Only the screen and the keyboard are taken over. The app never changes any status (Slack, Omni-Channel or otherwise).
 
-> **Status: v1.2.2.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, live wallpaper, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
+> **Status: v1.3.0.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
 
 ## What it does
 
 - Lives in the menu bar (no Dock icon).
 - Starts on demand, after a countdown, on a schedule, with an optional keyboard shortcut, or (experimental) when your Bluetooth devices leave range.
-- Opens a full-screen cover on every display showing your current wallpaper, including live wallpapers from apps like Backdrop, and nothing else. An optional message and a clock are shown on top.
+- Opens a full-screen cover on every display showing your current wallpaper as a still image (or a custom image or looping video you choose), and nothing else. An optional message and a clock are shown on top.
 - Hides and freezes the mouse pointer and ignores the mouse and keyboard, except:
   - **Touch ID** (default) and/or your **4-digit PIN** to unlock.
   - **F1 / F2** so you can still change brightness.
@@ -18,6 +18,11 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 - Logs everything it does (locks, unlocks, settings changes, permission problems) to a file.
 
 ## What's new
+
+**1.3.0**
+- **Live wallpaper removed.** The cover now shows your desktop wallpaper as a still image. Wallpaper apps such as Backdrop and the system aerial wallpapers pause playback when the desktop is covered, so the live capture froze after a few frames and could not be made to work. The Screen Recording permission, its Settings rows, the "live wallpaper" setting and the launch warm-up (the 1.2.2 prompt workaround) are gone, so macOS no longer asks for screen capture approval. You can remove the app's old Screen Recording entry in System Settings > Privacy & Security.
+- **Custom cover background.** Settings > General > Cover background lets you choose your own image or video instead of the desktop wallpaper (**Choose File…**, **Change…**, **Remove**). Images are shown scaled to fill the screen. Videos (mp4, mov, m4v and other formats macOS can play) play muted and loop seamlessly on every display and stop on unlock. The file is copied into `~/Library/Application Support/OrgScreenSaver`, so moving or deleting the original does not break it; choosing a new file or Remove deletes the old copy. Files macOS cannot read or play are rejected with an alert. See [Cover background](#cover-background).
+- **Fixed black camera snapshots.** The first frame after starting the camera was grabbed after 0.8 s, before auto-exposure had adjusted, giving an almost black photo. The first frame is now taken after 1.5 s, and near-black frames (average brightness under about 6%) are skipped for up to 4 s before whatever is available is saved, so a truly dark room still produces a photo. The camera stays on up to 6 s per capture.
 
 **1.2.2**
 - **Fixed the macOS "bypass the system window picker" prompt appearing under the cover**, which left the screen and Touch ID unusable. The launch warm-up only listed windows, which does not trigger that approval; only a real capture does. The warm-up now runs a tiny real capture while unlocked and repeats every 20 minutes (never while locked), and it is skipped when the guard relaunches into an existing lock. If the approval still expires mid-lock, the cover is unaffected only when live wallpaper is off, so turn it off if you want zero risk.
@@ -31,8 +36,7 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 **1.1.0**
 - **Open Snapshots Folder** menu item, next to Open Log Folder (the same button also exists in Settings > Security).
 - **Fixed a crash** when the cover appeared (Start Now, Lock In and schedules all hit it). The cover window now uses the plain `NSWindow` initializer.
-- **No permission prompts under the cover.** Screen Recording / ScreenCaptureKit is exercised at app launch (a real capture since 1.2.2, repeated every 20 minutes while unlocked), while the screen is uncovered, so any macOS prompt appears where you can answer it. During a lock, live wallpaper is used only if that warm-up succeeded; otherwise the static wallpaper is shown. (The camera was already skipped unless previously granted.)
-- **Stable code signing.** `build-app-bundle.sh` now signs with your `CODESIGN_IDENTITY`, else the first "Apple Development" certificate in your keychain, else ad-hoc (with a warning). A stable signature keeps Accessibility, Screen Recording and Camera grants across rebuilds. See [Signing and permissions](#signing-and-permissions).
+- **Stable code signing.** `build-app-bundle.sh` now signs with your `CODESIGN_IDENTITY`, else the first "Apple Development" certificate in your keychain, else ad-hoc (with a warning). A stable signature keeps Accessibility and Camera grants across rebuilds. See [Signing and permissions](#signing-and-permissions).
 
 ## What it is not
 
@@ -66,7 +70,6 @@ A setup window checks and requests each permission:
 | Permission | Required | Used for |
 |---|---|---|
 | Accessibility | Yes | Blocking keys and shortcuts while active |
-| Screen Recording | No (on by default) | Live wallpaper. Only the desktop wallpaper layer is captured, never your windows. Without it you get your static wallpaper |
 | Camera | No (on by default) | Photo on foreign key presses |
 | Touch ID | Auto-detected | Unlocking. If the Mac has no Touch ID, a PIN is required |
 | Bluetooth | Only if you use proximity | Auto-lock when devices leave range |
@@ -96,8 +99,8 @@ Lock In... adds a one-time schedule for 5, 15, 30 or 60 minutes from now. It app
 Settings has four tabs: General, Security, Schedule and Proximity.
 
 - **General:** one scrolling page with these sections:
-  - *General:* launch at login, keep display awake, live wallpaper on/off, optional **message** on the cover (empty by default).
-  - *Permissions:* live status (checked every second) and a Grant button for Accessibility, Screen Recording and Camera, plus Touch ID availability. Grant permissions here before locking: a macOS prompt that appears under the cover cannot be answered. Relaunch the app after granting Screen Recording so live wallpaper turns on. macOS re-asks for screen capture approval roughly monthly ("Allow For One Month"); the app triggers it while unlocked so you can answer it.
+  - *General:* launch at login, keep display awake, cover background (desktop wallpaper, or a custom image or video), optional **message** on the cover (empty by default).
+  - *Permissions:* live status (checked every second) and a Grant button for Accessibility and Camera, plus Touch ID availability. Grant permissions here before locking: a macOS prompt that appears under the cover cannot be answered.
   - *Shortcut:* an optional global shortcut to start the screen saver. **Off by default.** It must include Control, Option or Command.
   - *Updates:* current version, automatic check on/off, check now, install updates from GitHub releases. "Check for Updates..." in the menu jumps straight to this section.
   - *Logs:* view the recent log, refresh it, and open the folder.
@@ -113,13 +116,22 @@ Touch ID is offered automatically when the cover appears and again after any key
 - With a recovery code enabled, a wrong 4-digit entry stays pending until 8 digits are typed or 4 seconds pass.
 - F1 / F2 adjust brightness at any time.
 
+### Cover background
+
+By default the cover shows your current desktop picture as a still image (black if it cannot be read). In **Settings > General > Cover background** you can instead pick a custom image or video:
+
+- **Images:** anything macOS can open (png, jpg, heic and so on), scaled to fill each display.
+- **Videos:** mp4, mov, m4v and other playable formats. Muted, looped, scaled to fill. Large files take disk space and playback uses some battery while covered.
+- The chosen file is copied to `~/Library/Application Support/OrgScreenSaver/`; **Remove** deletes the copy and returns to the desktop wallpaper.
+- Live wallpapers from other apps (Backdrop and similar) cannot be shown, because they pause while the screen is covered. Export a clip of one and use it as a custom video.
+
 ### Camera snapshots
 
 Every key other than F1, F2 or a digit takes a photo, limited to one every 5 seconds and 100 per lock session. Photos are saved to `~/Library/Application Support/OrgScreenSaver/Snapshots/` (owner-only permissions) and deleted automatically after the retention period (30 days by default). The camera light turns on briefly each time. A video call using the camera can prevent a photo; this is logged.
 
 ## Signing and permissions
 
-macOS ties Accessibility, Screen Recording and Camera approvals to the app's code signature. With the default ad-hoc signature every rebuild is a "new app" and the approvals stop working. To keep them across rebuilds, sign every build with the same certificate:
+macOS ties Accessibility and Camera approvals to the app's code signature. With the default ad-hoc signature every rebuild is a "new app" and the approvals stop working. To keep them across rebuilds, sign every build with the same certificate:
 
 1. In Xcode: Settings > Accounts > add your Apple ID > Manage Certificates > **+** > **Apple Development**. (A self-signed code-signing certificate from Keychain Access also works: pass its name with `CODESIGN_IDENTITY`.)
 2. Check it: `security find-identity -v -p codesigning` should list it.
@@ -169,7 +181,7 @@ Maintainers: see [docs/RELEASING.md](docs/RELEASING.md).
 |---|---|
 | "Accessibility permission needed" | Grant it in System Settings > Privacy & Security > Accessibility, then reopen the app |
 | Shortcuts or permissions stop working after a rebuild | The build was signed ad-hoc or with a different certificate. Sign with a stable certificate (see [Signing and permissions](#signing-and-permissions)), then remove and re-add the app in Accessibility |
-| Wallpaper is black or static | Grant Screen Recording and relaunch the app (live wallpaper is warmed up at launch); check the log for "live wallpaper" lines |
+| Wallpaper is black | The desktop picture could not be read. Choose a custom image in Settings > General > Cover background |
 | A permission prompt appeared under the cover | Unlock with PIN / Touch ID, answer the prompt, and grant permissions in Settings > General > Permissions before locking |
 | App crashes when the cover starts | Update to 1.1.0 or later (fixes a `CoverWindow` initializer crash). Crash reports are in `~/Library/Logs/DiagnosticReports` |
 | `0 valid identities` when signing | Install Apple's WWDR G3 intermediate certificate (see [Signing and permissions](#signing-and-permissions)) |
@@ -187,7 +199,7 @@ Removes the app, settings, snapshots, logs and Keychain entries.
 
 ## Privacy
 
-Everything stays on your Mac. The PIN and recovery code are stored only as salted PBKDF2 hashes in your Keychain. Screen Recording reads only desktop-level windows (the wallpaper). The only network request is the optional GitHub update check.
+Everything stays on your Mac. The PIN and recovery code are stored only as salted PBKDF2 hashes in your Keychain. The only network request is the optional GitHub update check.
 
 ## For developers
 

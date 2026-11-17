@@ -1,84 +1,38 @@
 import AppKit
-import ScreenCaptureKit
-import CoreMedia
+import AVFoundation
 import OrgScreenSaverCore
 
 // MARK: - Wallpaper
 
-/// Shows the current wallpaper on a layer. Order of preference:
-/// 1. live capture of ONLY the desktop-level windows (supports apps like Backdrop), needs Screen Recording
-/// 2. the static desktop picture
-/// 3. black
-/// Screen Recording / ScreenCaptureKit can raise a system prompt on first use (and periodically on newer macOS).
-/// That prompt would sit under the cover and be unreachable, so it is triggered once at app launch, while the screen is
-/// uncovered. Live wallpaper is only used during a lock after this has completed successfully.
-enum LiveWallpaperGate {
-    private(set) static var ready = false
-    private static var timer: Timer?
-    private static var running = false
+/// Shows the custom background (image, or a muted looping video) if one is set, otherwise the current static desktop
+/// picture, otherwise black.
+final class WallpaperProvider {
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
 
-    /// Runs a real (tiny, short) SCStream capture while the screen is uncovered. Merely listing shareable content does
-    /// NOT trigger macOS's "bypass the system window picker" approval; only an actual startCapture does, and that prompt
-    /// recurs periodically. So the warm-up repeats while unlocked to keep the approval fresh, and a lock never starts a
-    /// capture that could raise a prompt under the cover (where it can't be clicked and blocks Touch ID).
-    static func warmUp() {
-        guard Settings.shared.liveWallpaper, CGPreflightScreenCaptureAccess() else { ready = false; return }
-        if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 20 * 60, repeats: true) { _ in warmUp() }
-        }
-        guard !running, !LockCoordinator.shared.isLocked else { return }
-        running = true
-        Task {
-            defer { running = false }
-            do {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-                guard let display = content.displays.first else { return }
-                let cfg = SCStreamConfiguration()
-                cfg.width = 16
-                cfg.height = 16
-                cfg.minimumFrameInterval = CMTime(value: 1, timescale: 1)
-                let s = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: cfg, delegate: nil)
-                try await s.startCapture()
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                try? await s.stopCapture()
-                await MainActor.run { ready = true }
-                log("wallpaper", "live wallpaper warm-up ok")
-            } catch {
-                await MainActor.run { ready = false }
-                log("wallpaper", "live wallpaper warm-up failed: \(error.localizedDescription); static wallpaper will be used")
-            }
-        }
-    }
-}
-
-final class WallpaperProvider: NSObject, SCStreamOutput, SCStreamDelegate {
-    private var stream: SCStream?
-    private weak var layer: CALayer?
-    private let sampleQueue = DispatchQueue(label: "orgscreensaver.wallpaper")
-
-    func start(screen: NSScreen, layer: CALayer, live: Bool) {
-        self.layer = layer
+    func start(screen: NSScreen, layer: CALayer) {
         layer.contentsGravity = .resizeAspectFill
         layer.backgroundColor = NSColor.black.cgColor
-        applyStatic(screen: screen, layer: layer)
-        guard live else { return }
-        guard CGPreflightScreenCaptureAccess(), LiveWallpaperGate.ready else {
-            log("wallpaper", "live wallpaper skipped: Screen Recording not granted or not warmed up; using static wallpaper")
-            return
-        }
-        Task { await self.startLive(screen: screen) }
-    }
-
-    func stop() {
-        let s = stream
-        stream = nil
-        Task { try? await s?.stopCapture() }
-    }
-
-    private func applyStatic(screen: NSScreen, layer: CALayer) {
-        if let url = NSWorkspace.shared.desktopImageURL(for: screen),
-           let img = NSImage(contentsOf: url),
-           let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+        if let video = CustomBackground.videoURL() {
+            let item = AVPlayerItem(url: video)
+            let p = AVQueuePlayer()
+            p.isMuted = true
+            p.preventsDisplaySleepDuringVideoPlayback = false
+            looper = AVPlayerLooper(player: p, templateItem: item)
+            let pl = AVPlayerLayer(player: p)
+            pl.frame = layer.bounds
+            pl.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+            pl.videoGravity = .resizeAspectFill
+            layer.addSublayer(pl)
+            player = p
+            p.play()
+            log("wallpaper", "custom video background playing")
+        } else if let custom = CustomBackground.loadImage() {
+            layer.contents = custom
+            log("wallpaper", "custom background applied")
+        } else if let url = NSWorkspace.shared.desktopImageURL(for: screen),
+                  let img = NSImage(contentsOf: url),
+                  let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             layer.contents = cg
             log("wallpaper", "static wallpaper applied")
         } else {
@@ -86,51 +40,61 @@ final class WallpaperProvider: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 
-    private func startLive(screen: NSScreen) async {
-        do {
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-            guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
-                  let display = content.displays.first(where: { $0.displayID == id }) else {
-                log("wallpaper", "live wallpaper: display not found")
-                return
-            }
-            let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
-            let windows = content.windows.filter { $0.windowLayer < iconLevel && $0.frame.intersects(display.frame) }
-            guard !windows.isEmpty else {
-                log("wallpaper", "live wallpaper: no desktop-level windows found")
-                return
-            }
-            log("wallpaper", "live wallpaper: capturing \(windows.count) desktop-level window(s): " +
-                windows.map { $0.owningApplication?.applicationName ?? "?" }.joined(separator: ","))
-            let filter = SCContentFilter(display: display, including: windows)
-            let cfg = SCStreamConfiguration()
-            let scale = screen.backingScaleFactor
-            cfg.width = Int(screen.frame.width * scale)
-            cfg.height = Int(screen.frame.height * scale)
-            cfg.pixelFormat = kCVPixelFormatType_32BGRA
-            cfg.minimumFrameInterval = CMTime(value: 1, timescale: 15)
-            cfg.showsCursor = false
-            cfg.queueDepth = 3
-            let s = SCStream(filter: filter, configuration: cfg, delegate: self)
-            try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: sampleQueue)
-            try await s.startCapture()
-            stream = s
-        } catch {
-            log("wallpaper", "live wallpaper failed: \(error.localizedDescription); keeping static wallpaper")
+    func stop() {
+        player?.pause()
+        looper?.disableLooping()
+        looper = nil
+        player = nil
+    }
+}
+
+// MARK: - Custom background
+
+enum CustomBackground {
+    static var directory: URL { AppPaths.appSupport }
+
+    private static func isVideo(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType?.conforms(to: .movie) ?? false
+    }
+
+    /// Copies the picked image or video into app support (so it survives the original being moved) and stores its path.
+    static func set(from url: URL) -> Bool {
+        let video = isVideo(url)
+        if video {
+            guard AVURLAsset(url: url).isPlayable else { return false }
+        } else {
+            guard NSImage(contentsOf: url) != nil else { return false }
         }
+        AppPaths.ensureDirectories()
+        clear()
+        let dest = directory.appendingPathComponent("background-\(Int(Date().timeIntervalSince1970)).\(url.pathExtension.lowercased())")
+        do {
+            try FileManager.default.copyItem(at: url, to: dest)
+        } catch {
+            log("wallpaper", "custom background copy failed: \(error.localizedDescription)")
+            return false
+        }
+        Settings.shared.customBackgroundPath = dest.path
+        return true
     }
 
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .screen, sampleBuffer.isValid,
-              let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
-              let raw = attachments.first?[.status] as? Int, raw == SCFrameStatus.complete.rawValue,
-              let pixels = sampleBuffer.imageBuffer,
-              let surface = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
-        DispatchQueue.main.async { [weak self] in self?.layer?.contents = surface }
+    static func clear() {
+        let path = Settings.shared.customBackgroundPath
+        if !path.isEmpty { try? FileManager.default.removeItem(atPath: path) }
+        Settings.shared.customBackgroundPath = ""
     }
 
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
-        log("wallpaper", "live wallpaper stream stopped: \(error.localizedDescription)")
+    static func videoURL() -> URL? {
+        let path = Settings.shared.customBackgroundPath
+        guard !path.isEmpty else { return nil }
+        let url = URL(fileURLWithPath: path)
+        return isVideo(url) ? url : nil
+    }
+
+    static func loadImage() -> CGImage? {
+        let path = Settings.shared.customBackgroundPath
+        guard !path.isEmpty, let img = NSImage(contentsOfFile: path) else { return nil }
+        return img.cgImage(forProposedRect: nil, context: nil, hints: nil)
     }
 }
 
@@ -148,7 +112,7 @@ final class CoverView: NSView {
     private let wallpaper = WallpaperProvider()
     private let screen: NSScreen
 
-    init(screen: NSScreen, message: String, testMode: Bool, liveWallpaper: Bool) {
+    init(screen: NSScreen, message: String, testMode: Bool) {
         self.screen = screen
         super.init(frame: NSRect(origin: .zero, size: screen.frame.size))
         wantsLayer = true
@@ -196,7 +160,7 @@ final class CoverView: NSView {
         }
         updateClock()
         clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateClock() }
-        wallpaper.start(screen: screen, layer: wallpaperLayer, live: liveWallpaper)
+        wallpaper.start(screen: screen, layer: wallpaperLayer)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -245,8 +209,8 @@ final class CoverWindow: NSWindow {
     let coverView: CoverView
     var onFallbackKey: ((NSEvent) -> Void)?
 
-    init(screen: NSScreen, message: String, testMode: Bool, liveWallpaper: Bool) {
-        coverView = CoverView(screen: screen, message: message, testMode: testMode, liveWallpaper: liveWallpaper)
+    init(screen: NSScreen, message: String, testMode: Bool) {
+        coverView = CoverView(screen: screen, message: message, testMode: testMode)
         super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]

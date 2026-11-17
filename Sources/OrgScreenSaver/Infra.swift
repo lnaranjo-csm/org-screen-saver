@@ -72,7 +72,7 @@ final class Settings: ObservableObject {
     @Published var snapshotEnabled: Bool { didSet { changed("snapshotEnabled", snapshotEnabled, oldValue) } }
     @Published var snapshotRetentionDays: Int { didSet { changed("snapshotRetentionDays", snapshotRetentionDays, oldValue) } }
     @Published var keepDisplayAwake: Bool { didSet { changed("keepDisplayAwake", keepDisplayAwake, oldValue) } }
-    @Published var liveWallpaper: Bool { didSet { changed("liveWallpaper", liveWallpaper, oldValue) } }
+    @Published var customBackgroundPath: String { didSet { changed("customBackgroundPath", customBackgroundPath, oldValue) } }
     @Published var hotkeyEnabled: Bool { didSet { changed("hotkeyEnabled", hotkeyEnabled, oldValue) } }
     @Published var hotkeyKeyCode: Int { didSet { changed("hotkeyKeyCode", hotkeyKeyCode, oldValue) } }
     @Published var hotkeyModifiers: Int { didSet { changed("hotkeyModifiers", hotkeyModifiers, oldValue) } }
@@ -93,7 +93,7 @@ final class Settings: ObservableObject {
         snapshotEnabled = b("snapshotEnabled", true)
         snapshotRetentionDays = i("snapshotRetentionDays", 30)
         keepDisplayAwake = b("keepDisplayAwake", true)
-        liveWallpaper = b("liveWallpaper", true)
+        customBackgroundPath = UserDefaults.standard.string(forKey: "customBackgroundPath") ?? ""
         hotkeyEnabled = b("hotkeyEnabled", false)
         hotkeyKeyCode = i("hotkeyKeyCode", 37) // L
         hotkeyModifiers = i("hotkeyModifiers", 4096 | 2048 | 256) // control + option + command (Carbon)

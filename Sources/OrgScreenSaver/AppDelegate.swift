@@ -25,7 +25,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         buildStatusItem()
         lock.onStateChange = { [weak self] in self?.updateIcon() }
         scheduler.start()
-        if !resumeLock { LiveWallpaperGate.warmUp() } // never prompt under a resumed cover
         ProximityMonitor.shared.apply()
         HotkeyManager.shared.onTrigger = { [weak self] in self?.startNow(reason: "hotkey") }
         let s = Settings.shared

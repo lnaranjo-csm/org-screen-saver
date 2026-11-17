@@ -1,3 +1,5 @@
+> **Note (1.3.0):** the live wallpaper capture described below (ScreenCaptureKit, Screen Recording) was removed. The cover now shows a still wallpaper or a custom image or video.
+
 # Org Screen Saver: Implementation Plan
 
 Status: **v0.1.0 built (compiles, 20 unit tests pass, app launches). Lock behavior still needs verification on a real session: see TEST-CHECKLIST.md.**
@@ -17,7 +19,7 @@ Status: **v0.1.0 built (compiles, 20 unit tests pass, app launches). Lock behavi
 | 9 | Updates via GitHub Releases (checksum-verified in-app updater, release workflow). |
 | 10 | Detailed rotating log of lock/unlock, settings changes and more. Secrets are never logged. |
 | 11 | **Test mode is a hidden config-file setting**, off by default, not in the UI. File: `~/Library/Application Support/OrgScreenSaver/config.json`. |
-| 12 | Screen Recording stays on for live wallpaper; can be removed later if it causes trouble. |
+| 12 | Screen Recording stays on for live wallpaper; can be removed later if it causes trouble. **Update (1.3.0): removed.** Wallpaper apps pause when covered, so the capture froze; replaced by still wallpaper plus a custom image or video. |
 | 13 | Managed Mac: build and observe what MDM does. |
 
 Changes from the original plan: the separate guard process is the same binary started with `--guard`; the Focus/DND idea is removed; proximity and the hotkey were added; Sparkle was replaced by a small GitHub-based updater.

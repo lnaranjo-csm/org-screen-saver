@@ -121,8 +121,7 @@ final class LockCoordinator {
     private func buildCovers() {
         covers.forEach { $0.coverView.tearDown(); $0.orderOut(nil); $0.close() }
         covers = NSScreen.screens.map { screen in
-            let w = CoverWindow(screen: screen, message: settings.message, testMode: testMode,
-                                liveWallpaper: settings.liveWallpaper)
+            let w = CoverWindow(screen: screen, message: settings.message, testMode: testMode)
             w.onFallbackKey = { [weak self] event in self?.handleFallback(event) }
             w.orderFrontRegardless()
             return w

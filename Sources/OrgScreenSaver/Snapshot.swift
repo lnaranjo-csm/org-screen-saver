@@ -11,6 +11,7 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     private let ciContext = CIContext()
     private var configured = false
     private var wantFrameAfter: Date?
+    private var giveUpDarkAt: Date?
     private var pendingTag = ""
     private var stopWork: DispatchWorkItem?
     private var throttle = SnapshotThrottle(minInterval: 5, maxPerSession: 100)
@@ -27,6 +28,7 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     func endLockSession() {
         queue.async {
             self.wantFrameAfter = nil
+            self.giveUpDarkAt = nil
             if self.session.isRunning { self.session.stopRunning() }
         }
     }
@@ -47,9 +49,13 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
             self.pendingTag = trigger
             if !self.session.isRunning {
                 self.session.startRunning()
-                self.wantFrameAfter = Date().addingTimeInterval(0.8) // let exposure settle
+                // A cold camera starts with very dark frames until auto-exposure converges, so wait before
+                // taking one, then keep skipping frames that are still near-black (up to a deadline).
+                self.wantFrameAfter = Date().addingTimeInterval(1.5)
+                self.giveUpDarkAt = Date().addingTimeInterval(4.0)
             } else {
                 self.wantFrameAfter = Date()
+                self.giveUpDarkAt = Date().addingTimeInterval(2.0)
             }
             self.stopWork?.cancel()
             let work = DispatchWorkItem { [weak self] in
@@ -57,7 +63,7 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
                 if self.session.isRunning { self.session.stopRunning() }
             }
             self.stopWork = work
-            self.queue.asyncAfter(deadline: .now() + 4, execute: work)
+            self.queue.asyncAfter(deadline: .now() + 6, execute: work)
         }
     }
 
@@ -81,8 +87,10 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let after = wantFrameAfter, Date() >= after,
               let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        wantFrameAfter = nil
         let image = CIImage(cvPixelBuffer: pixels)
+        if let deadline = giveUpDarkAt, Date() < deadline, meanBrightness(of: image) < 0.06 { return } // still too dark
+        wantFrameAfter = nil
+        giveUpDarkAt = nil
         guard let jpeg = ciContext.jpegRepresentation(of: image, colorSpace: CGColorSpaceCreateDeviceRGB(), options: [:]) else {
             log("snapshot", "JPEG encoding failed")
             return
@@ -98,6 +106,15 @@ final class SnapshotService: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         } catch {
             log("snapshot", "save failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Average brightness 0...1, computed on the GPU/CPU from a 1x1 area average.
+    private func meanBrightness(of image: CIImage) -> Double {
+        let avg = image.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: image.extent)])
+        var px = [UInt8](repeating: 0, count: 4)
+        ciContext.render(avg, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                         format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+        return (0.299 * Double(px[0]) + 0.587 * Double(px[1]) + 0.114 * Double(px[2])) / 255.0
     }
 
     /// Deletes snapshots older than the retention setting.

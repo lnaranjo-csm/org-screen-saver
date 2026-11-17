@@ -62,6 +62,19 @@ struct SecretEditor: View {
 
 // MARK: - Tabs
 
+private func pickBackground() {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.image, .movie]
+    panel.allowsMultipleSelection = false
+    panel.canChooseDirectories = false
+    panel.message = "Choose an image or video to use as the cover background"
+    if panel.runModal() == .OK, let url = panel.url, !CustomBackground.set(from: url) {
+        let a = NSAlert()
+        a.messageText = "Couldn't use that file"
+        a.runModal()
+    }
+}
+
 struct GeneralTab: View {
     @ObservedObject var s = Settings.shared
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
@@ -74,7 +87,16 @@ struct GeneralTab: View {
                     Toggle("Launch at login", isOn: $launchAtLogin)
                         .onChange(of: launchAtLogin) { LaunchAtLogin.set($0) }
                     Toggle("Keep the display awake while active", isOn: $s.keepDisplayAwake)
-                    Toggle("Show live wallpaper (needs Screen Recording)", isOn: $s.liveWallpaper)
+                    HStack {
+                        Text("Cover background")
+                        Spacer()
+                        Text(s.customBackgroundPath.isEmpty ? "Desktop wallpaper" : "Custom image/video")
+                            .foregroundStyle(.secondary)
+                        if !s.customBackgroundPath.isEmpty {
+                            Button("Remove") { CustomBackground.clear() }
+                        }
+                        Button(s.customBackgroundPath.isEmpty ? "Choose File…" : "Change…") { pickBackground() }
+                    }
                     TextField("Message on the cover (leave empty to show nothing)", text: $s.message, axis: .vertical)
                         .lineLimit(1...3)
                 }
@@ -318,7 +340,6 @@ struct PermissionRow: View {
 /// system prompts cannot be answered behind it.
 struct PermissionsSection: View {
     @State private var ax = AXIsProcessTrusted()
-    @State private var screen = CGPreflightScreenCaptureAccess()
     @State private var camera = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -326,9 +347,6 @@ struct PermissionsSection: View {
         Group {
             PermissionRow(title: "Accessibility", detail: "Required. Lets the app block keys and shortcuts while active.", ok: ax, required: true) {
                 _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
-            }
-            PermissionRow(title: "Screen Recording", detail: "Shows your live wallpaper (for example Backdrop). Only the wallpaper layer is read. Relaunch the app after granting.", ok: screen, required: false) {
-                _ = CGRequestScreenCaptureAccess()
             }
             PermissionRow(title: "Camera", detail: "Takes a photo when a foreign key is pressed on the cover.", ok: camera, required: false) {
                 AVCaptureDevice.requestAccess(for: .video) { _ in }
@@ -347,7 +365,6 @@ struct PermissionsSection: View {
         }
         .onReceive(timer) { _ in
             ax = AXIsProcessTrusted()
-            screen = CGPreflightScreenCaptureAccess()
             camera = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
         }
     }
@@ -375,7 +392,6 @@ struct SetupView: View {
     var onDone: () -> Void
     @ObservedObject var s = Settings.shared
     @State private var ax = AXIsProcessTrusted()
-    @State private var screen = CGPreflightScreenCaptureAccess()
     @State private var camera = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     @State private var hasPin = SecretStore.has(.pin)
     @State private var hasRecovery = SecretStore.has(.recovery)
@@ -386,9 +402,6 @@ struct SetupView: View {
             Text("Set up Org Screen Saver").font(.title2.bold())
             row("Accessibility", "Required. Lets the app block keys and shortcuts while active.", ax, required: true) {
                 _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
-            }
-            row("Screen Recording", "Shows your live wallpaper (for example Backdrop). Only the wallpaper layer is read.", screen, required: false) {
-                _ = CGRequestScreenCaptureAccess()
             }
             row("Camera", "Takes a photo when a foreign key is pressed on the cover.", camera, required: false) {
                 AVCaptureDevice.requestAccess(for: .video) { _ in }
@@ -420,7 +433,6 @@ struct SetupView: View {
         .frame(width: 520)
         .onReceive(timer) { _ in
             ax = AXIsProcessTrusted()
-            screen = CGPreflightScreenCaptureAccess()
             camera = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
             hasPin = SecretStore.has(.pin)
         }

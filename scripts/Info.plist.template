@@ -17,7 +17,5 @@
     <string>Org Screen Saver takes a photo when an unexpected key is pressed while the screen is covered.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Org Screen Saver can start automatically when your selected Bluetooth devices leave range.</string>
-    <key>NSScreenCaptureUsageDescription</key>
-    <string>Org Screen Saver reads only the desktop wallpaper layer so the cover can show your current wallpaper.</string>
 </dict>
 </plist>

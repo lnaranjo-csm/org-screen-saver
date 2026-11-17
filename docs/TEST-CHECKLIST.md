@@ -37,13 +37,14 @@ Record pass/fail and any log lines for each failure.
 - [ ] Activity Monitor cannot be reached
 - [ ] F1 and F2 change brightness, and brightness change is visible
 
-## 4. Wallpaper
+## 4. Wallpaper and cover background
 - [ ] Normal static wallpaper shows on the cover
-- [ ] With Backdrop running, the live wallpaper shows (log line "capturing N desktop-level window(s)")
-- [ ] No app windows or notifications content are visible in the captured wallpaper
-- [ ] Second display gets its own wallpaper
-- [ ] Screen capture approval prompt (if shown) appears while unlocked, never under the cover; log shows "live wallpaper warm-up ok"
-- [ ] Touch ID and keyboard work normally right after the lock starts
+- [ ] No Screen Recording prompt appears and Screen Recording is not listed under Permissions
+- [ ] Settings > General > Cover background: Choose File… with an image shows that image on the cover; Remove returns to the desktop wallpaper
+- [ ] Choosing a video plays it muted and looping with no visible gap, on every display, and it stops after unlock
+- [ ] Choosing a non-media file shows "Couldn't use that file" and keeps the previous background
+- [ ] Moving or deleting the original file does not affect the cover
+- [ ] Second display gets the background too
 
 ## 5. Everything keeps running
 - [ ] A download or a timer keeps progressing behind the cover
@@ -53,6 +54,7 @@ Record pass/fail and any log lines for each failure.
 
 ## 6. Snapshots
 - [ ] Pressing a letter key takes a photo (Snapshots folder, log line)
+- [ ] The photo is properly exposed, not black (taken after the camera adjusts)
 - [ ] Pressing digits, F1 or F2 takes no photo
 - [ ] Holding a key does not create more than one photo per 5 s
 - [ ] Camera in use by a video call: failure is logged, nothing crashes
