@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.orgscreensaver.app</string>
+    <key>CFBundleName</key><string>Org Screen Saver</string>
+    <key>CFBundleDisplayName</key><string>Org Screen Saver</string>
+    <key>CFBundleExecutable</key><string>OrgScreenSaver</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+    <key>CFBundleVersion</key><string>__VERSION__</string>
+    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>LSUIElement</key><true/>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>OSSUpdateRepo</key><string>__UPDATE_REPO__</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Org Screen Saver takes a photo when an unexpected key is pressed while the screen is covered.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Org Screen Saver can start automatically when your selected Bluetooth devices leave range.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Org Screen Saver reads only the desktop wallpaper layer so the cover can show your current wallpaper.</string>
+</dict>
+</plist>

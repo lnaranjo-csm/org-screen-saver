@@ -1,0 +1,54 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches VERSION file
+        run: |
+          [ "${GITHUB_REF_NAME#v}" = "$(tr -d '[:space:]' < VERSION)" ] || { echo "Tag $GITHUB_REF_NAME does not match VERSION"; exit 1; }
+      - name: Test
+        run: swift test
+      - name: Import signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.RELEASE_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.RELEASE_CERT_PASSWORD }}
+        run: |
+          if [ -z "$CERT_P12_BASE64" ]; then
+            echo "::warning::RELEASE_CERT_P12_BASE64 secret not set. Signing ad-hoc: users will have to re-grant permissions after every update."
+            exit 0
+          fi
+          KC="$RUNNER_TEMP/release.keychain-db"
+          KCPASS="$(uuidgen)"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          NAME="$(security find-identity -p codesigning "$KC" | sed -n 's/.*"\(.*\)"/\1/p' | head -1)"
+          [ -n "$NAME" ] || { echo "No code signing identity found in the imported certificate"; exit 1; }
+          echo "CODESIGN_IDENTITY=$NAME" >> "$GITHUB_ENV"
+          echo "Signing with: $NAME"
+      - name: Package
+        env:
+          UPDATE_REPO: ${{ github.repository }}
+        run: ./scripts/package-release.sh
+      - name: Release notes
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          # Use the matching "**X.Y.Z**" block from README "What's new", if present.
+          awk -v v="$V" '$0=="**" v "**"{f=1;next} f&&/^\*\*[0-9]/{exit} f&&/^## /{exit} f' README.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || echo "Release $V" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
