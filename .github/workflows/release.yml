@@ -33,10 +33,12 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" >/dev/null
           security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/cert.p12"
-          NAME="$(security find-identity -p codesigning "$KC" | sed -n 's/.*"\(.*\)"/\1/p' | head -1)"
-          [ -n "$NAME" ] || { echo "No code signing identity found in the imported certificate"; exit 1; }
-          echo "CODESIGN_IDENTITY=$NAME" >> "$GITHUB_ENV"
-          echo "Signing with: $NAME"
+          # Self-signed certs are listed as "(CSSMERR_TP_NOT_TRUSTED)" but sign fine. Select by SHA-1 hash, not by name.
+          LINE="$(security find-identity -p codesigning "$KC" | grep -E '^ *1\)' | head -1)"
+          HASH="$(echo "$LINE" | awk '{print $2}')"
+          [ -n "$HASH" ] || { echo "No code signing identity found in the imported certificate"; exit 1; }
+          echo "CODESIGN_IDENTITY=$HASH" >> "$GITHUB_ENV"
+          echo "Signing with identity: $LINE"
       - name: Package
         env:
           UPDATE_REPO: ${{ github.repository }}
