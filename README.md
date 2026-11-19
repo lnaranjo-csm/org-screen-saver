@@ -208,6 +208,10 @@ Removes the app, settings, snapshots, logs and Keychain entries.
 
 Everything stays on your Mac. The PIN and recovery code are stored only as salted PBKDF2 hashes in your Keychain. The only network request is the optional GitHub update check.
 
+## License
+
+Copyright (C) 2026 Luis Naranjo. Org Screen Saver is free software, licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-or-later). You can use, modify and redistribute it under those terms; derivative works you distribute must also be released under the GPL with source available. There is no warranty.
+
 ## For developers
 
 ```bash
