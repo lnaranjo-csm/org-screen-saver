@@ -19,6 +19,9 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 
 ## What's new
 
+**1.4.0**
+- **New app icon.** Org Screen Saver now has its own icon instead of the generic macOS one. It shows in Finder, in System Settings > Privacy & Security next to the permissions the app asks for, and in the macOS permission prompts. The app still lives only in the menu bar, so there is still no Dock icon, and the menu bar lock icon is unchanged. If Finder keeps showing the old icon after an update, run `killall Finder Dock` in Terminal.
+
 **1.3.0**
 - **Live wallpaper removed.** The cover now shows your desktop wallpaper as a still image. Wallpaper apps such as Backdrop and the system aerial wallpapers pause playback when the desktop is covered, so the live capture froze after a few frames and could not be made to work. The Screen Recording permission, its Settings rows, the "live wallpaper" setting and the launch warm-up (the 1.2.2 prompt workaround) are gone, so macOS no longer asks for screen capture approval. You can remove the app's old Screen Recording entry in System Settings > Privacy & Security.
 - **Custom cover background.** Settings > General > Cover background lets you choose your own image or video instead of the desktop wallpaper (**Choose File…**, **Change…**, **Remove**). Images are shown scaled to fill the screen. Videos (mp4, mov, m4v and other formats macOS can play) play muted and loop seamlessly on every display and stop on unlock. The file is copied into `~/Library/Application Support/OrgScreenSaver`, so moving or deleting the original does not break it; choosing a new file or Remove deletes the old copy. Files macOS cannot read or play are rejected with an alert. See [Cover background](#cover-background).
