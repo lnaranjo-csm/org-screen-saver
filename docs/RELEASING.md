@@ -11,9 +11,9 @@ Updates are delivered through GitHub Releases. The app's updater reads the lates
 
 ## Cutting a release
 
-1. Bump `VERSION` and commit. Either run `scripts/commit.sh minor "message"` (1.3.0 to 1.3.1) or `scripts/commit.sh larger "message"` (1.3.0 to 1.4.0), or edit `VERSION` by hand. The script stages all changes (`git add -A`), commits as `message (vX.Y.Z)`, and does not tag or push.
-2. Add a `**1.3.0**` block with bullets under "What's new" in `README.md` (before running the script so it lands in the same commit, or amend afterwards). The workflow uses that block as the release notes (falls back to "Release 1.3.0" if missing).
-3. Push to `main` and wait for `CI` to pass.
+1. Edit `VERSION` (for example `1.3.0`).
+2. Add a `**1.3.0**` block with bullets under "What's new" in `README.md`, in the same commit as the `VERSION` change. The workflow uses that block as the release notes shown on the GitHub release page (falls back to "Release 1.3.0" if the block is missing or its number does not match `VERSION`).
+3. Commit (message ending in the version, e.g. `Fix update install folder (v1.3.0)`), push to `main` and wait for `CI` to pass.
 4. Tag and push: `git tag v1.3.0 && git push origin v1.3.0`
 5. The `Release` workflow runs the tests, imports the signing certificate, builds the app, creates `OrgScreenSaver-1.3.0.zip` and `OrgScreenSaver-1.3.0.zip.sha256`, and publishes the release. It fails if the tag and `VERSION` disagree.
 
@@ -63,6 +63,10 @@ An Apple Developer ID certificate ($99/year) plus notarization removes the Gatek
 ### Local builds
 
 `scripts/build-app-bundle.sh` signs with `CODESIGN_IDENTITY` if set, else the first "Apple Development" certificate in your keychain, else ad-hoc.
+
+## Update install location
+
+The updater replaces the app in place when it can. If the running app is in a read-only location (a quarantined app launched from Downloads or a disk image runs from a temporary `AppTranslocation` copy) or in a folder the user cannot write to (such as `/Applications` without admin rights), it installs into `~/Applications/Org Screen Saver.app` instead and relaunches from there (since 1.4.1). Older versions fail with "Install folder is not writable"; those users must move the app to `~/Applications` and run the `xattr` command once.
 
 ## Private repositories
 

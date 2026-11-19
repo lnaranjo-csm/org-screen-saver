@@ -270,9 +270,19 @@ final class Updater: ObservableObject {
                     throw NSError(domain: "update", code: 2, userInfo: [NSLocalizedDescriptionKey: "No app in archive"])
                 }
                 try run("/usr/bin/codesign", ["--verify", "--deep", newApp.path])
-                let dest = Bundle.main.bundleURL
-                guard FileManager.default.isWritableFile(atPath: dest.deletingLastPathComponent().path) else {
-                    throw NSError(domain: "update", code: 3, userInfo: [NSLocalizedDescriptionKey: "Install folder is not writable"])
+                var dest = Bundle.main.bundleURL
+                // A quarantined app launched from Downloads/a DMG runs from a read-only
+                // "AppTranslocation" copy, and /Applications may need admin rights. In both
+                // cases install into ~/Applications instead (where install.sh puts it).
+                let translocated = dest.path.contains("/AppTranslocation/")
+                if translocated || !FileManager.default.isWritableFile(atPath: dest.deletingLastPathComponent().path) {
+                    let userApps = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+                    try? FileManager.default.createDirectory(at: userApps, withIntermediateDirectories: true)
+                    guard FileManager.default.isWritableFile(atPath: userApps.path) else {
+                        throw NSError(domain: "update", code: 3, userInfo: [NSLocalizedDescriptionKey: "Install folder is not writable. Move the app to ~/Applications and try again."])
+                    }
+                    dest = userApps.appendingPathComponent(dest.lastPathComponent)
+                    log("update", "current location is read-only or translocated; installing to \(dest.path)")
                 }
                 log("update", "verified \(rel.tag); replacing app and relaunching")
                 let pid = ProcessInfo.processInfo.processIdentifier

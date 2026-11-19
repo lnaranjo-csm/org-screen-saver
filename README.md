@@ -19,6 +19,10 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 
 ## What's new
 
+**1.4.1**
+- **Fixed "Install folder is not writable" when updating.** If you ran the app straight from Downloads (or from a mounted disk image), macOS runs it from a temporary read-only copy, so the in-app updater could not replace it. The updater now detects this, and also detects a folder it cannot write to such as `/Applications` without admin rights, and installs the new version into `~/Applications/Org Screen Saver.app` instead, then relaunches from there. The old copy in Downloads is left in place and can be deleted.
+- **If you are on 1.4.0 or earlier and see that error**, move the app to `~/Applications` once and remove the quarantine flag (see [Install](#install)); updates work from there, and from 1.4.1 on the updater handles it for you.
+
 **1.4.0**
 - **New app icon.** Org Screen Saver now has its own icon instead of the generic macOS one. It shows in Finder, in System Settings > Privacy & Security next to the permissions the app asks for, and in the macOS permission prompts. The app still lives only in the menu bar, so there is still no Dock icon, and the menu bar lock icon is unchanged. If Finder keeps showing the old icon after an update, run `killall Finder Dock` in Terminal.
 
@@ -210,8 +214,6 @@ Everything stays on your Mac. The PIN and recovery code are stored only as salte
 swift test          # unit tests for the core logic
 make app            # builds dist/Org Screen Saver.app (honors CODESIGN_IDENTITY, UPDATE_REPO)
 make release        # builds dist/OrgScreenSaver-<version>.zip and .sha256
-scripts/commit.sh minor "Fix X"      # bump VERSION 1.3.0 -> 1.3.1 and commit
-scripts/commit.sh larger "Add Y"     # bump VERSION 1.3.0 -> 1.4.0 and commit
 ```
 
 The app icon lives in `assets/` (`AppIcon.png` is the 1024px master, `AppIcon.icns` is what the build copies into the bundle). To change it, replace `AppIcon.png` and regenerate the `.icns` with `iconutil`; see [docs/RELEASING.md](docs/RELEASING.md#app-icon).

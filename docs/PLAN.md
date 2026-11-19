@@ -127,7 +127,7 @@ org-screen-saver/
     Guard/          GuardProcess (watchdog helper, same binary, `--guard` flag)
   Tests/OrgScreenSaverTests/  KeyClassifier, PinStore, AttemptLimiter, Scheduler
   assets/           AppIcon.png (1024px master), AppIcon.icns (copied into the bundle)
-  scripts/          build-app-bundle.sh (assemble .app, copy icon, codesign), commit.sh (bump VERSION + commit)
+  scripts/          build-app-bundle.sh (assemble .app, copy icon, codesign)
 ```
 
 Key units are small and testable without UI: `KeyClassifier` (event in, decision out), `PinEntryModel`, `AttemptLimiter`, `SchedulerService`.
