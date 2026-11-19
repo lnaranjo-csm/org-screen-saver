@@ -126,7 +126,8 @@ org-screen-saver/
     Settings/       SettingsView, PinSetupView, PermissionsView
     Guard/          GuardProcess (watchdog helper, same binary, `--guard` flag)
   Tests/OrgScreenSaverTests/  KeyClassifier, PinStore, AttemptLimiter, Scheduler
-  scripts/          build-app-bundle.sh (assemble .app, ad-hoc codesign)
+  assets/           AppIcon.png (1024px master), AppIcon.icns (copied into the bundle)
+  scripts/          build-app-bundle.sh (assemble .app, copy icon, codesign), commit.sh (bump VERSION + commit)
 ```
 
 Key units are small and testable without UI: `KeyClassifier` (event in, decision out), `PinEntryModel`, `AttemptLimiter`, `SchedulerService`.

@@ -27,6 +27,7 @@ echo "==> Assembling app bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/OrgScreenSaver"
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 sed -e "s|__VERSION__|$VERSION|g" -e "s|__UPDATE_REPO__|$REPO|g" scripts/Info.plist.template > "$APP/Contents/Info.plist"
 
 echo "==> Signing (identity: $IDENTITY)"

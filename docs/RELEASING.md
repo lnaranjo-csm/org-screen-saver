@@ -11,15 +11,30 @@ Updates are delivered through GitHub Releases. The app's updater reads the lates
 
 ## Cutting a release
 
-1. Edit `VERSION` (for example `1.3.0`).
-2. Add a `**1.3.0**` block with bullets under "What's new" in `README.md`. The workflow uses that block as the release notes (falls back to "Release 1.3.0" if missing).
-3. Commit and push to `main`, wait for `CI` to pass.
+1. Bump `VERSION` and commit. Either run `scripts/commit.sh minor "message"` (1.3.0 to 1.3.1) or `scripts/commit.sh larger "message"` (1.3.0 to 1.4.0), or edit `VERSION` by hand. The script stages all changes (`git add -A`), commits as `message (vX.Y.Z)`, and does not tag or push.
+2. Add a `**1.3.0**` block with bullets under "What's new" in `README.md` (before running the script so it lands in the same commit, or amend afterwards). The workflow uses that block as the release notes (falls back to "Release 1.3.0" if missing).
+3. Push to `main` and wait for `CI` to pass.
 4. Tag and push: `git tag v1.3.0 && git push origin v1.3.0`
 5. The `Release` workflow runs the tests, imports the signing certificate, builds the app, creates `OrgScreenSaver-1.3.0.zip` and `OrgScreenSaver-1.3.0.zip.sha256`, and publishes the release. It fails if the tag and `VERSION` disagree.
 
 Assets must be named so the zip ends in `.zip` and the checksum in `.zip.sha256`, which `scripts/package-release.sh` does.
 
 `CI` (`.github/workflows/ci.yml`) builds and tests every push to `main` and every pull request.
+
+## App icon
+
+The icon is `assets/AppIcon.icns`, copied into the bundle's `Resources` by `scripts/build-app-bundle.sh` and referenced by `CFBundleIconFile` in `scripts/Info.plist.template`. `assets/AppIcon.png` is the 1024x1024 master (rounded square on a transparent background, 824px artwork centered with the standard margin). To change it, replace the PNG and rebuild the `.icns`:
+
+```bash
+mkdir /tmp/AppIcon.iconset
+for s in 16 32 128 256 512; do
+  sips -z $s $s assets/AppIcon.png --out /tmp/AppIcon.iconset/icon_${s}x${s}.png
+  sips -z $((s*2)) $((s*2)) assets/AppIcon.png --out /tmp/AppIcon.iconset/icon_${s}x${s}@2x.png
+done
+iconutil -c icns /tmp/AppIcon.iconset -o assets/AppIcon.icns
+```
+
+The app is menu-bar only, so the icon shows in Finder, the release zip and system permission prompts, not the Dock. The menu bar lock icon is drawn in code and is separate. If Finder shows a stale icon after a change, run `killall Finder Dock`.
 
 ## Signing (important)
 

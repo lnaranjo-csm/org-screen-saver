@@ -207,6 +207,10 @@ Everything stays on your Mac. The PIN and recovery code are stored only as salte
 swift test          # unit tests for the core logic
 make app            # builds dist/Org Screen Saver.app (honors CODESIGN_IDENTITY, UPDATE_REPO)
 make release        # builds dist/OrgScreenSaver-<version>.zip and .sha256
+scripts/commit.sh minor "Fix X"      # bump VERSION 1.3.0 -> 1.3.1 and commit
+scripts/commit.sh larger "Add Y"     # bump VERSION 1.3.0 -> 1.4.0 and commit
 ```
+
+The app icon lives in `assets/` (`AppIcon.png` is the 1024px master, `AppIcon.icns` is what the build copies into the bundle). To change it, replace `AppIcon.png` and regenerate the `.icns` with `iconutil`; see [docs/RELEASING.md](docs/RELEASING.md#app-icon).
 
 See [docs/PLAN.md](docs/PLAN.md) for architecture and diagrams.
