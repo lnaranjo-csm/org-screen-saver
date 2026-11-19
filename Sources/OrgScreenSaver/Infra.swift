@@ -180,17 +180,20 @@ enum Biometrics {
         return LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err)
     }
 
-    static func evaluate(reason: String, completion: @escaping (Bool, String?) -> Void) {
+    /// Returns the context so the caller can invalidate a prompt the system silently dropped.
+    @discardableResult
+    static func evaluate(reason: String, completion: @escaping (Bool, String?) -> Void) -> LAContext? {
         let ctx = LAContext()
         ctx.localizedFallbackTitle = "" // no password fallback: the cover must not offer one
         var err: NSError?
         guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
             completion(false, err?.localizedDescription ?? "Biometrics unavailable")
-            return
+            return nil
         }
         ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { ok, error in
             DispatchQueue.main.async { completion(ok, error?.localizedDescription) }
         }
+        return ctx
     }
 }
 

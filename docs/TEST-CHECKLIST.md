@@ -62,10 +62,13 @@ Record pass/fail and any log lines for each failure.
 ## 7. Crash recovery
 - [ ] While locked, `pkill -9 -x OrgScreenSaver` (kills only the app): guard relaunches into locked state
 - [ ] Note the gap in seconds during which the screen is exposed
+- [ ] While locked, `kill -STOP $(pgrep -x OrgScreenSaver)` (freezes the app without killing it): after about 15 s the guard force-quits it and relaunches into locked state; log shows `app unresponsive`
+- [ ] Mac sleep and wake while locked does not trigger a false `app unresponsive` kill
 - [ ] `pkill -f OrgScreenSaver` kills both, so you are free again
 
 ## 8. Displays and power
-- [ ] Unplug or plug an external display while locked: covers rebuild
+- [ ] Unplug or plug an external display while locked: covers update once (a single `display configuration changed` log line) and a custom background video keeps playing on the displays that did not change
+- [ ] After plugging or unplugging a display while locked, Touch ID still unlocks (the log may show `Touch ID prompt had no result; restarting it`)
 - [ ] Lid close and open while locked: cover still active, Touch ID prompt returns
 - [ ] Sleep and wake with a schedule pending: schedule fires on wake if inside 10 min
 

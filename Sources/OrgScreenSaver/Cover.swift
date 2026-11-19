@@ -9,6 +9,7 @@ import OrgScreenSaverCore
 final class WallpaperProvider {
     private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
+    private var playerLayer: AVPlayerLayer?
 
     func start(screen: NSScreen, layer: CALayer) {
         layer.contentsGravity = .resizeAspectFill
@@ -24,6 +25,7 @@ final class WallpaperProvider {
             pl.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
             pl.videoGravity = .resizeAspectFill
             layer.addSublayer(pl)
+            playerLayer = pl
             player = p
             p.play()
             log("wallpaper", "custom video background playing")
@@ -43,6 +45,10 @@ final class WallpaperProvider {
     func stop() {
         player?.pause()
         looper?.disableLooping()
+        playerLayer?.player = nil
+        playerLayer?.removeFromSuperlayer()
+        playerLayer = nil
+        player?.removeAllItems()
         looper = nil
         player = nil
     }
@@ -207,9 +213,11 @@ final class CoverView: NSView {
 
 final class CoverWindow: NSWindow {
     let coverView: CoverView
+    let displayID: NSNumber?
     var onFallbackKey: ((NSEvent) -> Void)?
 
     init(screen: NSScreen, message: String, testMode: Bool) {
+        displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         coverView = CoverView(screen: screen, message: message, testMode: testMode)
         super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))

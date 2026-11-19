@@ -2,7 +2,7 @@
 
 A macOS menu bar app that covers your screen while you step away, **without locking your Mac**. Your apps, calls, downloads and Omni-Channel status keep running. Only the screen and the keyboard are taken over. The app never changes any status (Slack, Omni-Channel or otherwise).
 
-> **Status: v1.3.0.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
+> **Status: v1.5.0.** It compiles, the core logic has unit tests, and the app launches. The lock behavior itself (key blocking, force-quit blocking, Touch ID on the cover) is still being verified on real sessions. Work through [docs/TEST-CHECKLIST.md](docs/TEST-CHECKLIST.md) before relying on it, and keep test mode on while you do (see below). See [What's new](#whats-new) for recent changes.
 
 ## What it does
 
@@ -18,6 +18,11 @@ A macOS menu bar app that covers your screen while you step away, **without lock
 - Logs everything it does (locks, unlocks, settings changes, permission problems) to a file.
 
 ## What's new
+
+**1.5.0**
+- **Fixed Touch ID stopping after a display is connected or disconnected while locked.** macOS could silently drop the pending Touch ID request when the display setup changed, and the app then never asked again, so the cover could only be left by killing the app. The prompt is now restarted after every display change, and a prompt that gives no result for 15 seconds is restarted automatically.
+- **Frozen cover recovery.** The watchdog (guard process) now also detects an app that is running but frozen. If the app stops responding for 15 seconds while locked, the guard force-quits it and relaunches it into the locked state, and the log records `app unresponsive`. Previously it only reacted to the app exiting.
+- **Smoother display changes.** Display changes are coalesced (macOS often sends several notifications for one change), and covers for displays that did not change are kept instead of rebuilt, so a custom background video is no longer restarted on every display event. Video players are also released more cleanly.
 
 **1.4.1**
 - **Fixed "Install folder is not writable" when updating.** If you ran the app straight from Downloads (or from a mounted disk image), macOS runs it from a temporary read-only copy, so the in-app updater could not replace it. The updater now detects this, and also detects a folder it cannot write to such as `/Applications` without admin rights, and installs the new version into `~/Applications/Org Screen Saver.app` instead, then relaunches from there. The old copy in Downloads is left in place and can be deleted.
@@ -117,7 +122,7 @@ Settings has four tabs: General, Security, Schedule and Proximity.
 
 ### Unlocking
 
-Touch ID is offered automatically when the cover appears and again after any key press. If you use a PIN, just type it (there is no text box; dots fill as you type).
+Touch ID is offered automatically when the cover appears, again after any key press, and again after a display is connected or disconnected. If you use a PIN, just type it (there is no text box; dots fill as you type).
 
 - Wrong PIN: the dots shake and clear. After 3 wrong tries there is a 30-second wait, from the 6th a 5-minute wait.
 - With a recovery code enabled, a wrong 4-digit entry stays pending until 8 digits are typed or 4 seconds pass.
@@ -193,7 +198,8 @@ Maintainers: see [docs/RELEASING.md](docs/RELEASING.md).
 | App crashes when the cover starts | Update to 1.1.0 or later (fixes a `CoverWindow` initializer crash). Crash reports are in `~/Library/Logs/DiagnosticReports` |
 | `0 valid identities` when signing | Install Apple's WWDR G3 intermediate certificate (see [Signing and permissions](#signing-and-permissions)) |
 | No snapshots | Grant Camera permission; check the log for "snapshot" lines |
-| Touch ID does nothing on the cover | Check the log for "Touch ID not accepted"; set a PIN as a fallback |
+| Touch ID does nothing on the cover | Check the log for "Touch ID not accepted" or "Touch ID prompt had no result; restarting it"; press any key to ask again, and set a PIN as a fallback. Update to 1.5.0 or later if it stops after plugging in a display |
+| Cover froze while locked | Update to 1.5.0 or later: the guard force-quits a frozen app after 15 s and relaunches it locked (look for `app unresponsive` in the log) |
 | Stuck and cannot unlock | From another Mac via SSH: `pkill -f OrgScreenSaver`. Last resort: hold the power button |
 
 ## Uninstall

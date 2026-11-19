@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import LocalAuthentication
 import OrgScreenSaverCore
 
 /// Owns the locked state and everything that happens when entering and leaving it.
@@ -18,6 +19,9 @@ final class LockCoordinator {
     private var limiter = AttemptLimiter()
     private var testMode = false
     private var bioInFlight = false
+    private var bioContext: LAContext?
+    private var bioGeneration = 0
+    private var bioStartedAt = Date.distantPast
     private var cursorHidden = false
     private var bufferTimer: Timer?
     private var statusTimer: Timer?
@@ -25,6 +29,7 @@ final class LockCoordinator {
     private var guardProcess: Process?
     private var lockedAt = Date()
     private var screenObserver: NSObjectProtocol?
+    private var screenDebounce: DispatchWorkItem?
 
     private init() {
         tap.isLocked = { [weak self] in self?.isLocked ?? false }
@@ -104,6 +109,7 @@ final class LockCoordinator {
         statusTimer?.invalidate(); statusTimer = nil
         testTimer?.invalidate(); testTimer = nil
         if let o = screenObserver { NotificationCenter.default.removeObserver(o); screenObserver = nil }
+        screenDebounce?.cancel(); screenDebounce = nil
         showCursor()
         NSApp.presentationOptions = []
         covers.forEach { $0.coverView.tearDown(); $0.orderOut(nil); $0.close() }
@@ -118,22 +124,43 @@ final class LockCoordinator {
 
     // MARK: Covers
 
+    /// Keeps one cover per display. Covers for unchanged displays are reused (just re-framed) so a display
+    /// reconfiguration does not tear down and restart every video player.
     private func buildCovers() {
-        covers.forEach { $0.coverView.tearDown(); $0.orderOut(nil); $0.close() }
-        covers = NSScreen.screens.map { screen in
-            let w = CoverWindow(screen: screen, message: settings.message, testMode: testMode)
-            w.onFallbackKey = { [weak self] event in self?.handleFallback(event) }
-            w.orderFrontRegardless()
-            return w
+        var kept: [CoverWindow] = []
+        var remaining = covers
+        for screen in NSScreen.screens {
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            if let i = remaining.firstIndex(where: { $0.displayID != nil && $0.displayID == id }) {
+                let w = remaining.remove(at: i)
+                if w.frame != screen.frame { w.setFrame(screen.frame, display: true) }
+                w.orderFrontRegardless()
+                kept.append(w)
+            } else {
+                let w = CoverWindow(screen: screen, message: settings.message, testMode: testMode)
+                w.onFallbackKey = { [weak self] event in self?.handleFallback(event) }
+                w.orderFrontRegardless()
+                kept.append(w)
+            }
         }
+        remaining.forEach { $0.coverView.tearDown(); $0.orderOut(nil); $0.close() }
+        covers = kept
         covers.first?.makeKeyAndOrderFront(nil)
     }
 
     private func screensChanged() {
         guard isLocked else { return }
-        log("lock", "display configuration changed; rebuilding covers (\(NSScreen.screens.count))")
-        buildCovers()
-        refreshCovers()
+        // macOS often posts several notifications for one reconfiguration; coalesce them.
+        screenDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.isLocked else { return }
+            log("lock", "display configuration changed; updating covers (\(NSScreen.screens.count))")
+            self.buildCovers()
+            self.refreshCovers()
+            self.promptBiometrics(force: true)
+        }
+        screenDebounce = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: work)
     }
 
     private func refreshCovers() {
@@ -246,12 +273,23 @@ final class LockCoordinator {
 
     // MARK: Touch ID
 
-    private func promptBiometrics() {
-        guard isLocked, Auth.touchIDActive, !bioInFlight else { return }
+    /// `force` abandons a prompt the system may have silently dropped (display change) and starts a fresh one.
+    private func promptBiometrics(force: Bool = false) {
+        guard isLocked, Auth.touchIDActive else { return }
+        if bioInFlight {
+            // A prompt that never reports back must not block Touch ID for the rest of the session.
+            guard force || Date().timeIntervalSince(bioStartedAt) > 15 else { return }
+            log("security", "Touch ID prompt had no result; restarting it")
+            bioContext?.invalidate()
+        }
+        bioGeneration += 1
+        let generation = bioGeneration
         bioInFlight = true
-        Biometrics.evaluate(reason: "Unlock Org Screen Saver") { [weak self] ok, error in
-            guard let self else { return }
+        bioStartedAt = Date()
+        bioContext = Biometrics.evaluate(reason: "Unlock Org Screen Saver") { [weak self] ok, error in
+            guard let self, generation == self.bioGeneration else { return } // superseded prompt
             self.bioInFlight = false
+            self.bioContext = nil
             guard self.isLocked else { return }
             if ok {
                 self.unlock(reason: "Touch ID")
@@ -266,6 +304,8 @@ final class LockCoordinator {
     private func startTimers(config: AppConfig) {
         statusTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self, self.isLocked else { return }
+            Heartbeat.beat()
+            if self.bioInFlight { self.promptBiometrics() } // only recovers a prompt stalled >15s
             self.tap.reenableIfNeeded()
             self.ensureGuardAlive()
             self.refreshCovers()
